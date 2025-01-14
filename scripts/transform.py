@@ -1,10 +1,15 @@
 import logging
+from datetime import datetime
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def formatar_data(data):
-    return data[:10]
+    # Remove o timestamp e converte para o formato yyyy-mm-dd
+    try:
+        return datetime.fromisoformat(data[:-1]).strftime('%Y-%m-%d')
+    except ValueError:
+        raise ValueError(f"Formato de data inválido: {data}")
 
 def extrair_nome_franqueado(franqueado):
     return franqueado['nome']
