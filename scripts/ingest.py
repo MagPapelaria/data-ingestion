@@ -21,7 +21,7 @@ params = {
 logging.info("Iniciando a extração de dados da API.")
 
 try:
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers, params=params, timeout=10)
     if response.status_code == 200:
         pedidos = response.json()
         logging.info("Dados extraídos com sucesso.")
