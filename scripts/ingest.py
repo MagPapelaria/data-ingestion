@@ -15,7 +15,7 @@ headers = {
     'x-api-key': os.getenv("API_KEY")
 }
 params = {
-    'periodo': "2025-01-1",
+    'periodo': "2025-01-22",
 }
 
 logging.info("Iniciando a extração de dados da API.")
