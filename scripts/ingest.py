@@ -4,6 +4,7 @@ from load import load_dados
 import os
 from dotenv import load_dotenv
 import logging
+from datetime import datetime  # Importa o módulo datetime
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,8 +15,12 @@ url = os.getenv("URL")
 headers = {
     'x-api-key': os.getenv("API_KEY")
 }
+
+# Obtém a data de hoje no formato "YYYY-MM-DD"
+hoje = datetime.today().strftime('%Y-%m-%d')
+
 params = {
-    'periodo': "2025-01-22",
+    'periodo': hoje,  # Define o período como a data de hoje
 }
 
 logging.info("Iniciando a extração de dados da API.")
