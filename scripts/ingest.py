@@ -1,158 +1,76 @@
+# plugins/pedidos_utils.py
 import requests
 import psycopg2
 import os
 import logging
-from datetime import datetime, timedelta
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from dotenv import load_dotenv
+from datetime import datetime
 
-# Configuração de logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configuração do logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Configuração do dotenv
-load_dotenv()
-
-# Funções de transformação (do arquivo transform.py)
-def formatar_data(data):
-    try:
-        return datetime.fromisoformat(data[:-1]).strftime('%Y-%m-%d')
-    except ValueError:
-        raise ValueError(f"Formato de data inválido: {data}")
-
-def extrair_nome_franqueado(franqueado):
-    return franqueado['nome']
-
-def extrair_nome_fornecedor(fornecedor):
-    return fornecedor['nome']
-
-def limpar_dados(pedidos):
-    logging.info("Iniciando a limpeza e transformação dos dados.")
-    dados_limpos = []
-    try:
-        for pedido in pedidos:
-            dados_limpos.append({
-                'número_do_pedido': pedido['codigo'],
-                'status': pedido['situacao']['descricao'],
-                'franqueado': extrair_nome_franqueado(pedido['franqueado']),
-                'fornecedor': extrair_nome_fornecedor(pedido['fornecedor']),
-                'data_do_pedido': formatar_data(pedido['dataCriacao']),
-            })
-        logging.info("Transformação concluída com sucesso.")
-    except Exception as e:
-        logging.exception("Erro ao transformar os dados.")
-    return dados_limpos
-
-# Funções de carregamento (do arquivo load.py)
+# Função para conectar ao banco de dados
 def conectar_banco():
     try:
         conn = psycopg2.connect(
-            dbname=os.getenv("DB_NAME"), 
-            user=os.getenv("DB_USER"), 
-            password=os.getenv("DB_PASSWORD"),  
-            host=os.getenv("DB_HOST"),  
-            port=os.getenv("DB_PORT")
+            dbname= os.getenv('DB_NAME'),
+            user= os.getenv('DB_USER'),
+            password= os.getenv('DB_PASSWORD'),
+            host= os.getenv('DB_HOST'),
+            port= os.getenv('DB_PORT'),
         )
-        logging.info("Conexão com o banco de dados bem-sucedida.")
+        logging.info('Conexão com banco de dados feita com sucesso!')
         return conn
     except Exception as e:
-        logging.exception("Erro ao conectar ao banco de dados.")
+        logging.error(f'Erro ao conectar ao banco: {e}')
         return None
 
-def verificar_pedido_existente(conn, numero_pedido):
+# Função para inserir os pedidos no banco de dados
+def inserir_pedido(conn, numero_pedido, status, franqueado, fornecedor, data_pedido, valor_pedido):
     try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM pedidos WHERE numero_pedido = %s::VARCHAR", (str(numero_pedido),))
-        existe = cursor.fetchone()
-        cursor.close()
-        return existe is not None
+        with conn.cursor() as cursor:
+            query = """
+            INSERT INTO pedidos (numero_pedido, status, franqueado, fornecedor, data_pedido, valor_pedido)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (numero_pedido) DO NOTHING;
+            """
+            cursor.execute(query, (numero_pedido, status, franqueado, fornecedor, data_pedido, valor_pedido))
+        conn.commit()
+        logging.info(f'Pedido {numero_pedido} inserido com sucesso!')
     except Exception as e:
-        logging.exception(f"Erro ao verificar se o pedido {numero_pedido} já existe.")
-        return False
+        logging.error(f'Erro ao inserir pedido {numero_pedido}: {e}')
 
-def inserir_pedidos_no_bd(pedidos):
-    conn = conectar_banco()
-    if conn is not None:
-        try:
-            cursor = conn.cursor()
-            pedidos_adicionados = []
-
-            for pedido in pedidos:
-                if not verificar_pedido_existente(conn, pedido['número_do_pedido']):
-                    cursor.execute(""" 
-                        INSERT INTO pedidos (numero_pedido, status, franqueado, fornecedor, data_pedido)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, (pedido['número_do_pedido'], pedido['status'], pedido['franqueado'], pedido['fornecedor'], pedido['data_do_pedido']))
-                    pedidos_adicionados.append(str(pedido['número_do_pedido']))
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-
-            if pedidos_adicionados:
-                logging.info(f"Pedidos adicionados: {', '.join(pedidos_adicionados)}")
-            else:
-                logging.info("Nenhum pedido novo foi adicionado.")
-        except Exception as e:
-            logging.exception("Erro ao inserir pedidos no banco de dados.")
-    else:
-        logging.error("Falha na conexão com o banco.")
-
-def load_dados(pedidos_limpos):
-    logging.info("Iniciando o carregamento dos dados no banco de dados.")
-    inserir_pedidos_no_bd(pedidos_limpos)
-
-# Função principal (do arquivo principal.py)
-def ingest_data_caf():
-    url = os.getenv("URL")
-    headers = {
-        'x-api-key': os.getenv("API_KEY")
-    }
-
+# Função principal para buscar e processar pedidos
+def processar_pedidos():
+    url = 'https://app.centraldofranqueado.com.br/api/v2/pedidos/'
     hoje = datetime.today().strftime('%Y-%m-%d')
+    headers = {'x-api-key': os.getenv('API_KEY')}
+    
+    params = {'periodo': hoje}
 
-    params = {
-        'periodo': hoje,
-    }
+    response = requests.get(url, params=params, headers=headers)
 
-    logging.info("Iniciando a extração de dados da API.")
+    if response.status_code == 200:
+        dados_pedidos = response.json()
 
-    try:
-        response = requests.get(url, headers=headers, params=params, timeout=10)
-        if response.status_code == 200:
-            pedidos = response.json()
-            logging.info("Dados extraídos com sucesso.")
-            
-            pedidos_limpos = limpar_dados(pedidos)
-            logging.info("Dados transformados com sucesso.")
-            
-            load_dados(pedidos_limpos)
-            logging.info("Dados carregados no banco com sucesso.")
+        if isinstance(dados_pedidos, list):
+            conn = conectar_banco()
+            if conn:
+                for pedido in dados_pedidos:
+                    numero_pedido = pedido['codigo']
+                    status = pedido['situacao']['descricao']
+                    franqueado = pedido['franqueado']['nome']
+                    fornecedor = pedido['fornecedor']['nome']
+                    data_pedido = datetime.strptime(pedido['dataCriacao'], '%Y-%m-%dT%H:%M:%S.%fZ').strftime('%d-%m-%Y')
+                    valor_pedido = sum(item['quantidadeProdutos'] * item['valorUnitario'] for item in pedido['itensPedido'])
+
+                    inserir_pedido(conn, numero_pedido, status, franqueado, fornecedor, data_pedido, valor_pedido)
+
+                conn.close()
+                logging.info('Conexão com banco de dados fechada.')
+            else:
+                logging.error('Não foi possível conectar ao banco.')
         else:
-            logging.error(f"Erro ao acessar a API: {response.status_code}, {response.text}")
-    except Exception as e:
-        logging.exception(f"Erro durante a extração de dados: {e}")
-
-# Configuração do DAG no Airflow
-default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5)
-}
-
-with DAG(
-    'ingest_data_caf',
-    default_args=default_args,
-    description='Pipeline que pega dados do CAF e sobe no banco de dados',
-    schedule_interval='59 23 * * *',
-    start_date=datetime(2025, 1, 28),
-    catchup=False, 
-) as dag:
-
-    ingest_data_caf_task = PythonOperator(
-        task_id='ingest_data_caf_task',
-        python_callable=ingest_data_caf
-    )
-
-    ingest_data_caf_task
+            logging.error("A resposta da API não é uma lista de pedidos.")
+    else:
+        logging.error(f"Erro na requisição: {response.status_code}")
+        logging.error(response.text)
