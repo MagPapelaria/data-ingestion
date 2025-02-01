@@ -5,6 +5,8 @@ import logging
 from datetime import datetime, timedelta
 from dotenv import load_dotenv  
 
+load_dotenv()
+
 # Configuração do logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
