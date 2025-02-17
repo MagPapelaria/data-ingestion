@@ -47,7 +47,8 @@ def processar_pedidos():
     headers = {'x-api-key': os.getenv('API_KEY')}
     
     # Exemplo: buscar pedidos dos últimos 30 dias
-    params = {'periodo':'2025-02-01'}
+    data_atual = datetime.today().strftime('%Y-%m-%d')
+    params = {'periodo':data_atual}
 
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
