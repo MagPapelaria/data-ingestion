@@ -7,10 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuração do logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Função para conectar ao banco de dados
 def conectar_banco():
     try:
         conn = psycopg2.connect(
@@ -26,7 +24,6 @@ def conectar_banco():
         logging.error(f'Erro ao conectar ao banco: {e}')
         return None
 
-# Função para inserir os pedidos no banco de dados
 def inserir_pedido(conn, numero_pedido, status, franqueado, fornecedor, data_pedido, valor_pedido):
     try:
         with conn.cursor() as cursor:
@@ -48,7 +45,7 @@ def processar_pedidos():
     
     # Exemplo: buscar pedidos dos últimos 30 dias
     data_atual = datetime.today().strftime('%Y-%m-%d')
-    params = {'periodo':data_atual}
+    params = {'periodo': data_atual}
 
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
