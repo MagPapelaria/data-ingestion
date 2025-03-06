@@ -57,7 +57,7 @@ def processar_pedidos():
     headers = {'x-api-key': os.getenv('API_KEY')}
     
     # Fornece a data para API
-    params = {'periodo': "2025-02-12"}
+    params = {'periodo': "2025-02-10"}
 
     # Configuração de retry para a requisição HTTP
     retry_strategy = Retry(
