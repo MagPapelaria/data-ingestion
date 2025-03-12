@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from psycopg2 import pool, extras
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 
 load_dotenv()
 
@@ -18,8 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
-# Função para extrair dados de um pedido
-def extrair_dados_pedido(pedido: dict) -> Optional[Tuple]:
+def extrair_dados_pedido(pedido: Dict[str, Any]) -> Optional[Tuple]:
     """
     Extrai os dados relevantes de um pedido da API.
     Retorna uma tupla com (numero_pedido, status, franqueado, fornecedor, data_pedido, mes_pedido, valor_pedido).
@@ -38,8 +37,10 @@ def extrair_dados_pedido(pedido: dict) -> Optional[Tuple]:
         logging.error(f"Erro ao processar pedido: campo {e} não encontrado.")
         return None
 
-# Função para configurar o pool de conexões
-def conectar_banco():
+def conectar_banco() -> Optional[psycopg2.extensions.connection]:
+    """
+    Configura e retorna uma conexão com o banco de dados.
+    """
     try:
         connection_pool = psycopg2.pool.SimpleConnectionPool(
             minconn=int(os.getenv('DB_POOL_MIN', 1)),
@@ -57,8 +58,11 @@ def conectar_banco():
         logging.error(f'Erro ao conectar ao banco: {e}')
         return None
 
-# Função para inserir os pedidos em batch no banco de dados
-def inserir_pedidos_batch(conn, pedidos: List[Tuple]):
+def inserir_pedidos_batch(conn: psycopg2.extensions.connection, pedidos: List[Tuple]) -> int:
+    """
+    Insere os pedidos em batch no banco de dados.
+    Retorna o número de pedidos inseridos.
+    """
     try:
         with conn.cursor() as cursor:
             query = """
@@ -75,14 +79,14 @@ def inserir_pedidos_batch(conn, pedidos: List[Tuple]):
         logging.error(f'Erro ao inserir pedidos em batch: {e}', exc_info=True)
         return 0
 
-# Função para atualizar os status diretamente na tabela 'pedidos'
-def atualizar_status_pedidos(conn, pedidos: List[Tuple]):
+def atualizar_status_pedidos(conn: psycopg2.extensions.connection, pedidos: List[Tuple]) -> int:
+    """
+    Atualiza os status dos pedidos diretamente na tabela 'pedidos'.
+    Retorna o número de pedidos atualizados.
+    """
     try:
         with conn.cursor() as cursor:
-            # Preparar dados para atualização
             dados_update = [(p[1], str(p[0])) for p in pedidos]
-
-            # Query para atualizar vários pedidos de uma vez
             update_query = """
             UPDATE pedidos
             SET status = atualizado.status
@@ -90,26 +94,22 @@ def atualizar_status_pedidos(conn, pedidos: List[Tuple]):
             WHERE pedidos.numero_pedido = atualizado.numero_pedido
             AND pedidos.status != atualizado.status;
             """
-
-            # Executar a atualização
             extras.execute_values(cursor, update_query, dados_update, template="(%s, %s)")
             conn.commit()
-
-            # Contar quantos pedidos foram atualizados
-            quantidade_atualizados = cursor.rowcount  # Usando rowcount para obter o número de linhas afetadas
-
+            quantidade_atualizados = cursor.rowcount
             logging.info(f'{quantidade_atualizados} pedidos tiveram seu status atualizado.')
             return quantidade_atualizados
-
     except Exception as e:
         logging.error(f'Erro ao atualizar status dos pedidos: {e}', exc_info=True)
         return 0
 
-# Função principal para buscar e processar pedidos
 def processar_pedidos():
+    """
+    Função principal para buscar e processar pedidos.
+    """
     url = 'https://app.centraldofranqueado.com.br/api/v2/pedidos/'
     headers = {'x-api-key': os.getenv('API_KEY')}
-    params = {'periodo': datetime.today().strftime('%Y-%m-%d')}
+    params = {'periodo': '2025-03-12'}
 
     retry_strategy = Retry(
         total=3,
@@ -131,30 +131,24 @@ def processar_pedidos():
                 logging.error("A resposta da API não é uma lista de pedidos.")
                 return
 
-            conn = conectar_banco()
-            if not conn:
-                logging.error('Não foi possível conectar ao banco.')
-                return
+            with conectar_banco() as conn:
+                if not conn:
+                    logging.error('Não foi possível conectar ao banco.')
+                    return
 
-            pedidos_para_inserir = []
-            for pedido in dados_pedidos:
-                dados = extrair_dados_pedido(pedido)  # Extrai os dados do pedido
-                if dados:  # Se os dados foram extraídos com sucesso
-                    pedidos_para_inserir.append(dados)
+                pedidos_para_inserir = [extrair_dados_pedido(pedido) for pedido in dados_pedidos]
+                pedidos_para_inserir = [pedido for pedido in pedidos_para_inserir if pedido]
 
-            pedidos_inseridos = 0
-            if pedidos_para_inserir:
-                pedidos_inseridos = inserir_pedidos_batch(conn, pedidos_para_inserir)
-                status_atualizados = atualizar_status_pedidos(conn, pedidos_para_inserir)
+                pedidos_inseridos = 0
+                if pedidos_para_inserir:
+                    pedidos_inseridos = inserir_pedidos_batch(conn, pedidos_para_inserir)
+                    status_atualizados = atualizar_status_pedidos(conn, pedidos_para_inserir)
 
-            conn.close()
-            logging.info(f'Conexão com banco de dados fechada.')
-            logging.info(f'Total de pedidos inseridos: {pedidos_inseridos}')
-            logging.info(f'Total de status atualizados: {status_atualizados}')
+                logging.info(f'Total de pedidos inseridos: {pedidos_inseridos}')
+                logging.info(f'Total de status atualizados: {status_atualizados}')
 
         except requests.exceptions.RequestException as e:
             logging.error(f"Erro na requisição HTTP: {e}")
 
-# Executar a função principal
 if __name__ == "__main__":
     processar_pedidos()
