@@ -7,7 +7,8 @@ def processa_chamados():
 
     url = 'https://app.centraldofranqueado.com.br/api/v2/pedidos/'
     headers = {'x-api-key': os.getenv('API_KEY')}
-    params = {'status': 'opened'}
+    params = {'status': 'opened',
+              }
 
     response = requests.get(url, headers=headers, params=params)
     
