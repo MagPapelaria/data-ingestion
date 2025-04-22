@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from typing import List, Tuple, Optional, Dict, Any
-
+import unicodedata
 # Carrega variáveis de ambiente
 load_dotenv()
 
@@ -52,12 +52,14 @@ def extrair_dados_pedido(pedido: Dict[str, Any]) -> Optional[Tuple]:
     """
     try:
         numero_pedido = pedido['codigo']
-        status = pedido['situacao']['descricao']
+        status_bruto = pedido['situacao']['descricao']
+        status = status_bruto.upper()
         franqueado = pedido['franqueado']['nome']
 
         # Limpa o nome do fornecedor e coloca em caps
         fornecedor_bruto = pedido['fornecedor']['nome']
         fornecedor = fornecedor_bruto.split('-')[-1].strip().upper()
+        fornecedor = unicodedata.normalize("NFKD", fornecedor).encode("ASCII", "ignore").decode("ASCII")
 
         data_pedido = datetime.strptime(pedido['dataCriacao'], '%Y-%m-%dT%H:%M:%S.%fZ')
         mes_pedido = MESES[data_pedido.month - 1]
@@ -123,7 +125,7 @@ def processar_pedidos() -> None:
     """
     url = 'https://app.centraldofranqueado.com.br/api/v2/pedidos/'
     headers = {'x-api-key': os.getenv('API_KEY')}
-    params = {'periodo': '2025-04-17'}
+    params = {'periodo': '2025-04-21'}
 
     retry_strategy = Retry(
         total=3,
