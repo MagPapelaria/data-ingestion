@@ -9,7 +9,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 def buscar_pedidos(periodo: str):
-    url = 'https://app.centraldofranqueado.com.br/api/v2/pedidos/'
+    url = os.getenv('API_URL'),
     headers = {'x-api-key': os.getenv('API_KEY')}
     params = {'periodo': periodo}
 
