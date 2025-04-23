@@ -1,46 +1,83 @@
-# Data Ingestion ETL
+# 📦 Central de Pedidos - Coleta e Atualização Automatizada
 
-Este projeto implementa um pipeline de ETL (Extração, Transformação e Carregamento) para processar dados de pedidos obtidos por meio de uma API e armazená-los em um banco de dados PostgreSQL.
-
-## Visão Geral do Sistema
-
-O sistema é dividido em três módulos principais:
-
-1. **Ingestão**  
-   O módulo de ingestão realiza a comunicação com a API para obter os dados brutos. Ele utiliza a biblioteca `requests` para enviar requisições HTTP com cabeçalhos e parâmetros dinâmicos, configurados via variáveis de ambiente.
-
-2. **Transformação**  
-   Após a extração, os dados são processados e transformados para garantir a integridade e consistência. Isso inclui:
-   - Conversão de datas para um formato padronizado.
-   - Extração de nomes de franqueados e fornecedores.
-   - Renomeação e estruturação de campos para um formato adequado ao banco de dados.
-
-3. **Carregamento**  
-   O módulo de carregamento é responsável por inserir os dados transformados no banco de dados PostgreSQL. Antes de realizar a inserção, o sistema verifica se o registro já existe, garantindo que apenas novos dados sejam adicionados.
+Este projeto tem como objetivo centralizar e automatizar a coleta de dados de pedidos feitos pelos franqueados através da API da Central do Franqueado. Ele é responsável por extrair as informações essenciais dos pedidos, armazená-las de forma estruturada no banco de dados da empresa e manter os dados atualizados com base em novos status fornecidos pela API.
 
 ---
 
-## Funcionalidades
+## 🧠 Objetivo do Projeto
 
-- **Conexão Segura com a API**  
-  As informações de URL e chaves de autenticação são armazenadas em variáveis de ambiente para garantir segurança e flexibilidade.
-
-- **Transformação Personalizada**  
-  Os dados passam por um processo de limpeza que os prepara para serem armazenados no banco de forma consistente.
-
-- **Controle de Duplicidade**  
-  Antes de inserir um pedido no banco, o sistema verifica se ele já existe para evitar duplicações.
-
-- **Modularidade**  
-  O sistema foi projetado em módulos independentes (`ingest.py`, `transform.py`, `load.py`), o que facilita a manutenção e a escalabilidade.
+- Reduzir o trabalho manual de coleta e digitação de dados de pedidos.
+- Padronizar e garantir a qualidade dos dados que entram no banco.
+- Possibilitar análises mais confiáveis e rápidas sobre o volume, origem e status dos pedidos feitos.
+- Atualizar automaticamente os status de pedidos previamente cadastrados, evitando retrabalho e inconsistências.
 
 ---
 
-## Tecnologias Utilizadas
+## 🏗️ Visão Técnica
 
-- **Linguagem**: Python  
-- **Bibliotecas**:
-  - `requests` para comunicação com a API.
-  - `psycopg2` para interação com o banco de dados PostgreSQL.
-  - `python-dotenv` para gerenciar variáveis de ambiente.
-- **Banco de Dados**: PostgreSQL
+### Módulos principais:
+
+- **`main.py`**  
+  Ponto de entrada da aplicação. É responsável por iniciar o processo de coleta e atualização.
+
+- **`api.py`**  
+  Faz a requisição à API de pedidos, com estratégia de retry configurada para garantir robustez na comunicação.
+
+- **`processador.py`**  
+  Contém a lógica de extração e transformação dos dados dos pedidos, e orquestra o envio ao banco de dados.
+
+- **`db.py`**  
+  Gerencia a conexão com o banco PostgreSQL via pool de conexões e executa os comandos de inserção e atualização.
+
+- **`utils.py`**  
+  Funções auxiliares, como tratamento de strings, normalização e dicionários fixos (ex.: nomes dos meses).
+
+---
+
+## 🧩 Principais Funcionalidades
+
+- **Coleta diária de pedidos** com base na data definida no código (`params` da API).
+- **Extração de dados brutos** como: número do pedido, status, fornecedor, franqueado, valor total e data.
+- **Transformação padronizada** dos dados: normalização de nomes, remoção de acentos e capitalização.
+- **Inserção em lote (batch)** de novos pedidos com tratamento de conflitos (ignora duplicados).
+- **Atualização de status** de pedidos já existentes.
+- **Log detalhado** das execuções para rastreabilidade e auditoria.
+
+---
+
+## 🧪 Tecnologias Utilizadas
+
+- **Python 3.10+**
+- **PostgreSQL**
+- **Requests** (requisições HTTP)
+- **psycopg2** (conexão com banco)
+- **dotenv** (gerenciamento de variáveis de ambiente)
+- **logging** (registro estruturado de execução)
+
+---
+
+## 🔐 Segurança e Controle
+
+- As credenciais de banco de dados e da API são carregadas através de variáveis de ambiente (.env), garantindo segurança no uso do projeto.
+- Todas as operações no banco utilizam **prepared statements**, evitando injeção de SQL.
+- Conexões são gerenciadas com **pool**, otimizando desempenho e evitando sobrecarga no banco.
+
+---
+
+## 📊 Resultados Esperados
+
+Com o projeto ativo, espera-se:
+
+- Diminuição de erros humanos na digitação de pedidos.
+- Acesso a dados mais completos e atualizados.
+- Otimização do tempo das equipes operacionais.
+
+---
+
+## 🛠️ Manutenção
+
+O código é modularizado e pode ser adaptado facilmente em caso de mudanças no formato da API, alterações no banco de dados ou regras de negócio. Todas as funções seguem boas práticas de logging e tratamento de erros para facilitar o suporte técnico.
+
+---
+
+> Projeto desenvolvido e mantido pela equipe de Supply e Dados
