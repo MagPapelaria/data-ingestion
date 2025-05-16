@@ -9,7 +9,7 @@ MESES = [
 def extrair_dados_pedido(pedido):
     try:
         numero_pedido = pedido['codigo']
-        status = pedido['situacao']['descricao'].upper()
+        status = pedido['situacao']['descricao'].upper().encode("ASCII", "ignore").decode("ASCII")
         franqueado = pedido['franqueado']['nome']
 
         fornecedor_bruto = pedido['fornecedor']['nome']
