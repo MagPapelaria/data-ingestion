@@ -6,7 +6,7 @@ from utils import extrair_dados_pedido
 logger = logging.getLogger(__name__)
 
 def processar_pedidos():
-    pedidos_json = buscar_pedidos('2025-04-28')
+    pedidos_json = buscar_pedidos('2025-05-18')
 
     if not isinstance(pedidos_json, list):
         logger.warning("Resposta da API não é uma lista.")
