@@ -2,11 +2,14 @@ import logging
 from db import get_conn, put_conn, inserir_pedidos_batch, atualizar_status_pedidos
 from api import buscar_pedidos
 from utils import extrair_dados_pedido
+from datetime import date
+
 
 logger = logging.getLogger(__name__)
 
 def processar_pedidos():
-    pedidos_json = buscar_pedidos('2025-05-18')
+    data_hoje = date.today().isoformat()
+    pedidos_json = buscar_pedidos(data_hoje)
 
     if not isinstance(pedidos_json, list):
         logger.warning("Resposta da API não é uma lista.")
