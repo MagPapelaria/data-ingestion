@@ -51,6 +51,7 @@ df['ano'] = df['data_pedido'].dt.year
 df['mes'] = df['data_pedido'].dt.month
 df['ano_mes'] = df['data_pedido'].dt.to_period('M').astype(str)
 
+
 # Filtros
 with st.sidebar:
     st.title("Filtros")
@@ -59,6 +60,8 @@ with st.sidebar:
     status = st.multiselect("Status", df["status"].unique())
     anos = st.multiselect("Ano", sorted(df["ano"].unique()))
     meses = st.multiselect("Mês", sorted(df["mes"].unique()))
+    data_inicio = st.date_input("Data inicial", df["data_pedido"].min())
+    data_fim = st.date_input("Data final", df["data_pedido"].max())
     st.markdown("---")
 
 if franqueados:
@@ -71,6 +74,8 @@ if anos:
     df = df[df["ano"].isin(anos)]
 if meses:
     df = df[df["mes"].isin(meses)]
+    
+df = df[(df['data_pedido'] >= pd.to_datetime(data_inicio)) & (df['data_pedido'] <= pd.to_datetime(data_fim))]
 
 # Remover franqueados [Excluídos] das análises
 df_franqueados_ativos = df[~df['franqueado'].str.contains(r'\[Excluído\]', case=False, na=False)]
