@@ -93,7 +93,7 @@ st.markdown("""<h4>📅 Total de Pedidos por Mês
 </span></h4>""", unsafe_allow_html=True)
 
 df_mensal = df.groupby('ano_mes').agg({'numero_pedido': 'count'}).reset_index().rename(columns={'numero_pedido': 'total_pedidos'})
-fig_trend = px.line(df_mensal, x='ano_mes', y='total_pedidos', markers=True, title="Evolução Mensal de Pedidos")
+fig_trend = px.line(df_mensal, x='ano_mes', y='total_pedidos', markers=True, title="Evolução Mensal de Pedidos", color_discrete_sequence=px.colors.qualitative.Plotly)
 fig_trend.update_layout(xaxis_title="Mês", yaxis_title="Quantidade de Pedidos")
 st.plotly_chart(fig_trend, use_container_width=True)
 
@@ -107,7 +107,7 @@ st.markdown("""<h4>🏪 Top Franqueados por Quantidade de Pedidos
 
 df_rank = df_franqueados_ativos.groupby('franqueado')['numero_pedido'].count().reset_index(name='qtd_pedidos')
 df_rank = df_rank.sort_values(by='qtd_pedidos', ascending=False).head(10)
-fig_rank = px.bar(df_rank, x='franqueado', y='qtd_pedidos', title="Top 10 Franqueados")
+fig_rank = px.bar(df_rank, x='franqueado', y='qtd_pedidos', title="Top 10 Franqueados", color='franqueado',  color_discrete_sequence=px.colors.qualitative.Set2 )
 st.plotly_chart(fig_rank, use_container_width=True)
 
 # ⏱️ Tempo Médio Entre Pedidos
