@@ -2,8 +2,5 @@ streamlit
 plotly
 pandas
 psycopg2
-logging
 requests
-os
 fastapi
-unicodedata
