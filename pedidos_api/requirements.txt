@@ -6,3 +6,4 @@ requests
 fastapi
 python-dotenv
 xlsxwriter
+scikit-learn
