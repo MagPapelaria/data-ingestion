@@ -5,6 +5,7 @@ import io
 import os
 from dotenv import load_dotenv
 from db import get_conn, put_conn
+from datetime import date, timedelta # Importar timedelta para cálculos de data
 
 st.set_page_config(page_title="Dashboard de Pedidos", layout="wide", initial_sidebar_state="expanded")
 
@@ -14,29 +15,29 @@ load_dotenv()
 st.markdown("""
 <style>
 .tooltip {
-  position: relative;
-  display: inline-block;
-  cursor: pointer;
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
 }
 .tooltip .tooltiptext {
-  visibility: hidden;
-  width: 260px;
-  background-color: rgba(60, 60, 60, 0.9);
-  color: #fff;
-  text-align: left;
-  border-radius: 8px;
-  padding: 10px;
-  position: absolute;
-  z-index: 1;
-  bottom: 125%;
-  left: 0%;
-  opacity: 0;
-  transition: opacity 0.3s;
-  font-size: 13px;
+  visibility: hidden;
+  width: 260px;
+  background-color: rgba(60, 60, 60, 0.9);
+  color: #fff;
+  text-align: left;
+  border-radius: 8px;
+  padding: 10px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 0%;
+  opacity: 0;
+  transition: opacity 0.3s;
+  font-size: 13px;
 }
 .tooltip:hover .tooltiptext {
-  visibility: visible;
-  opacity: 1;
+  visibility: visible;
+  opacity: 1;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -102,10 +103,49 @@ with st.sidebar:
     unique_status = sorted(df_original["status"].unique())
     status = st.multiselect("Selecione Status", unique_status)
 
-    min_date = df_original["data_pedido"].min().date()
-    max_date = df_original["data_pedido"].max().date()
-    data_inicio = st.date_input("Data Inicial", min_date)
-    data_fim = st.date_input("Data Final", max_date)
+    st.markdown("---")
+    st.subheader("Período de Análise")
+
+    # --- NOVO CÓDIGO PARA FILTRO DE PERÍODO PERSONALIZADO ---
+    today = date.today()
+    min_date_original = df_original["data_pedido"].min().date()
+    max_date_original = df_original["data_pedido"].max().date()
+
+    period_option = st.radio(
+        "Escolher Período:",
+        ("Personalizado", "Últimos 30 dias", "Últimos 90 dias", "Mês Atual", "Ano Atual", "Todo o Período")
+    )
+
+    # Inicializa data_inicio e data_fim com valores padrão ou do período selecionado
+    data_inicio = min_date_original
+    data_fim = max_date_original
+
+    if period_option == "Últimos 30 dias":
+        data_inicio = today - timedelta(days=30)
+        data_fim = today
+    elif period_option == "Últimos 90 dias":
+        data_inicio = today - timedelta(days=90)
+        data_fim = today
+    elif period_option == "Mês Atual":
+        data_inicio = today.replace(day=1)
+        data_fim = today
+    elif period_option == "Ano Atual":
+        data_inicio = date(today.year, 1, 1)
+        data_fim = today
+    elif period_option == "Todo o Período":
+        data_inicio = min_date_original
+        data_fim = max_date_original
+
+    if period_option == "Personalizado":
+        # Se for personalizado, o usuário pode selecionar as datas livremente
+        # Usa os valores já definidos acima como default para evitar erro de Value
+        data_inicio = st.date_input("Data Inicial", value=data_inicio)
+        data_fim = st.date_input("Data Final", value=data_fim)
+    else:
+        # Para opções pré-definidas, as datas são exibidas mas desabilitadas
+        st.date_input("Data Inicial", value=data_inicio, disabled=True)
+        st.date_input("Data Final", value=data_fim, disabled=True)
+
     st.markdown("---")
 
     top_n = st.number_input(
@@ -125,6 +165,7 @@ if fornecedores:
 if status:
     df_filtered = df_filtered[df_filtered["status"].isin(status)]
 
+# Converte as datas de início e fim para datetime para comparação
 df_filtered = df_filtered[
     (df_filtered['data_pedido'] >= pd.to_datetime(data_inicio)) & 
     (df_filtered['data_pedido'] <= pd.to_datetime(data_fim))
@@ -177,9 +218,9 @@ with tab1:
         df_decline = df_trend[df_trend['variacao'] < 0].sort_values(by='variacao', ascending=True).head(top_n)
         if not df_decline.empty:
             fig_decline = px.bar(df_decline, x='franqueado', y='variacao',
-                                title=f"Top {top_n} Franqueados com Maior Queda",
-                                color_discrete_sequence=['#FF6347'],
-                                hover_data={'variacao': ':,0f'}) # Formata com separador de milhares
+                                 title=f"Top {top_n} Franqueados com Maior Queda",
+                                 color_discrete_sequence=['#FF6347'],
+                                 hover_data={'variacao': ':,0f'}) # Formata com separador de milhares
             fig_decline.update_layout(yaxis_title="Variação (nº de pedidos)", xaxis_title="", xaxis_tickangle=-45)
             st.plotly_chart(fig_decline, use_container_width=True)
             st.download_button("📥 Exportar Queda", export_excel(df_decline), file_name="queda_pedidos.xlsx")
@@ -206,13 +247,47 @@ with tab2:
     st.markdown("""<h4>📅 Total de Pedidos por Mês</h4>""", unsafe_allow_html=True)
 
     df_monthly = df_filtered.groupby('ano_mes').agg(total_pedidos=('numero_pedido', 'count')).reset_index()
-    fig_trend = px.line(df_monthly, x='ano_mes', y='total_pedidos', markers=True, 
-                        title="Evolução Mensal de Pedidos", 
-                        color_discrete_sequence=px.colors.qualitative.Plotly,
-                        hover_data={'total_pedidos': ':,0f'}) # Formata com separador de milhares
-    fig_trend.update_layout(xaxis_title="Mês", yaxis_title="Quantidade de Pedidos")
-    st.plotly_chart(fig_trend, use_container_width=True)
-    st.download_button("📥 Exportar Pedidos Mensais", export_excel(df_monthly), file_name="pedidos_mensais.xlsx")
+    # Garante que 'ano_mes' seja ordenável para o gráfico
+    df_monthly['ano_mes_dt'] = pd.to_datetime(df_monthly['ano_mes'])
+    df_monthly = df_monthly.sort_values('ano_mes_dt')
+
+    # --- NOVO CÓDIGO PARA PREVISÃO SIMPLES ---
+    if len(df_monthly) >= 3:
+        # Pega os últimos 3 meses para calcular a média
+        last_3_months = df_monthly['total_pedidos'].tail(3)
+        avg_last_3_months = last_3_months.mean()
+
+        # Calcula o próximo mês
+        last_month_period = pd.Period(df_monthly['ano_mes'].iloc[-1])
+        next_month_period = last_month_period + 1
+        next_month_str = str(next_month_period)
+
+        # Adiciona a previsão ao DataFrame para plotagem
+        df_monthly_forecast = df_monthly.copy()
+        df_monthly_forecast = pd.concat([df_monthly_forecast, pd.DataFrame([{'ano_mes': next_month_str, 'total_pedidos': avg_last_3_months, 'ano_mes_dt': pd.to_datetime(next_month_str)}])], ignore_index=True)
+        
+        fig_trend = px.line(df_monthly_forecast, x='ano_mes', y='total_pedidos', markers=True, 
+                            title="Evolução Mensal de Pedidos com Previsão (Próximo Mês)", 
+                            color_discrete_sequence=px.colors.qualitative.Plotly,
+                            hover_data={'total_pedidos': ':,0f'})
+        fig_trend.update_layout(xaxis_title="Mês", yaxis_title="Quantidade de Pedidos")
+        
+        # Destaca a previsão
+        fig_trend.add_scatter(x=[next_month_str], y=[avg_last_3_months], mode='markers', 
+                              name='Previsão', marker=dict(color='red', size=10, symbol='star'))
+        
+        st.plotly_chart(fig_trend, use_container_width=True)
+        st.info(f"**Previsão para {next_month_str}:** Aproximadamente **{int(avg_last_3_months):,.0f}** pedidos (baseado na média dos últimos 3 meses).")
+        st.download_button("📥 Exportar Pedidos Mensais e Previsão", export_excel(df_monthly_forecast[['ano_mes', 'total_pedidos']]), file_name="pedidos_mensais_e_previsao.xlsx")
+    else:
+        st.warning("São necessários pelo menos 3 meses de dados para gerar a previsão. Ajuste o período de filtro ou aguarde mais dados.")
+        fig_trend = px.line(df_monthly, x='ano_mes', y='total_pedidos', markers=True, 
+                            title="Evolução Mensal de Pedidos", 
+                            color_discrete_sequence=px.colors.qualitative.Plotly,
+                            hover_data={'total_pedidos': ':,0f'})
+        fig_trend.update_layout(xaxis_title="Mês", yaxis_title="Quantidade de Pedidos")
+        st.plotly_chart(fig_trend, use_container_width=True)
+        st.download_button("📥 Exportar Pedidos Mensais", export_excel(df_monthly), file_name="pedidos_mensais.xlsx")
     
     st.markdown("---")
 
